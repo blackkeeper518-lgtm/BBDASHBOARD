@@ -1,0 +1,298 @@
+import React, { useState, useEffect } from "react";
+
+// ==========================================
+// [VERSION]: V42.0 - EMPIRE OVERLORD (STABLE)
+// [STATUS]: PRODUCTION READY / DASHBOARD DEFAULT
+// [SECRET]: Triple-click "PRECISION_LOCK" to trigger Secret Ops
+// [COLOR]: BB STORE (PURPLE-BLACK NEON)
+// ==========================================
+
+const SUPABASE_URL = "https://nlgecesyjcrrqwiitlyt.supabase.co";
+const SUPABASE_KEY = "sb_publishable_1agyo85-Uxq1VAllYjl1gg_M_utlMbw";
+const ACCESS_KEY = "1234";
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState("dashboard"); 
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [passInput, setPassInput] = useState("");
+  const [showGate, setShowGate] = useState(false);
+  
+  const [supabaseClient, setSupabaseClient] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Stats & Data
+  const [phone, setPhone] = useState("");
+  const [trackingData, setTrackingData] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [stats, setStats] = useState({ totalOrders: 0, totalCOD: 0, todayCOD: 0, aov: 0 });
+  const [adminSearch, setAdminSearch] = useState("");
+  const [importStatus, setImportStatus] = useState({ processing: false, count: 0, logs: [] });
+
+  const EMPIRE_GOAL = 100000;
+
+  // 🕒 Initialization
+  useEffect(() => {
+    const scripts = [
+      'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+      'https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js'
+    ];
+    let loadedCount = 0;
+    scripts.forEach(src => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.onload = () => {
+        loadedCount++;
+        if (loadedCount === scripts.length && window.supabase) {
+          // @ts-ignore
+          setSupabaseClient(window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY));
+        }
+      };
+      document.body.appendChild(script);
+    });
+
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // 🔒 Fetch Logic
+  const fetchAdminData = async () => {
+    if (!supabaseClient || !isAuthorized) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabaseClient
+        .from("parcels_bb")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setOrders(data);
+        const totalCOD = data.reduce((sum, item) => sum + Number(item.cod_amount || 0), 0);
+        
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayCOD = data
+          .filter(item => item.created_at && item.created_at.startsWith(todayStr))
+          .reduce((sum, item) => sum + Number(item.cod_amount || 0), 0);
+
+        const totalOrders = data.length;
+        const aov = totalOrders > 0 ? totalCOD / totalOrders : 0;
+        setStats({ totalOrders, totalCOD, todayCOD, aov });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthorized) fetchAdminData();
+  }, [supabaseClient, isAuthorized]);
+
+  const handleTabChange = (tab) => {
+    if ((tab === 'dashboard' || tab === 'ops') && !isAuthorized) {
+      setShowGate(true);
+      return;
+    }
+    setActiveTab(tab);
+    setShowGate(false);
+  };
+
+  const verifyAccess = () => {
+    if (passInput === ACCESS_KEY) {
+      setIsAuthorized(true);
+      setShowGate(false);
+      setPassInput("");
+      setActiveTab("dashboard");
+    } else {
+      setPassInput(""); // Simple feedback instead of alert
+    }
+  };
+
+  // 🕵️ Secret Reset Ops
+  const [clickCount, setClickCount] = useState(0);
+  const handleSecretClick = () => {
+    setClickCount(prev => prev + 1);
+    if (clickCount >= 2) {
+      const confirmReset = window.confirm("SECRET_OPS: รีเซ็ตยอดรายวันหรือไม่? (ยอดสะสมจะไม่หาย)");
+      if (confirmReset) {
+        setStats(prev => ({ ...prev, todayCOD: 0 }));
+        setClickCount(0);
+      }
+    }
+    setTimeout(() => setClickCount(0), 2000);
+  };
+
+  const cleanName = (n) => n ? n.replace(/^[0-9\s.]+/, "").replace(/^(คุณ|นาย|นางสาว|นาง|👤)\s*/gi, "").trim() : "ลูกค้า VIP";
+
+  const handleSearch = async () => {
+    if (!supabaseClient || phone.trim().length < 4) return;
+    setLoading(true);
+    setTrackingData(null);
+    try {
+      const { data } = await supabaseClient
+        .from("parcels_bb")
+        .select("consignee_name, tracking_no, cod_amount")
+        .or(`phone_no.ilike.%${phone.trim()}%,tracking_no.ilike.%${phone.trim()}%`)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) setTrackingData(data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !supabaseClient) return;
+    setImportStatus({ processing: true, count: 0, logs: ["📡 เชื่อมต่อคลังแสงอาณาจักรบีบี..."] });
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        // @ts-ignore
+        const workbook = window.XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        // @ts-ignore
+        const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        const batch = [];
+        rows.forEach((row, i) => {
+          if (i === 0) return;
+          const track = String(row[2] || "").trim();
+          if (!track.toUpperCase().startsWith("TH")) return;
+          const phoneNum = String(row[4] || "").replace(/\D/g, "");
+          if (phoneNum.length >= 9) {
+            batch.push({
+              tracking_no: track.toUpperCase(),
+              phone_no: phoneNum,
+              consignee_name: cleanName(String(row[3] || "")),
+              address: String(row[5] || ""),
+              cod_amount: parseFloat(String(row[9] || "0").replace(/,/g, "")) || 0,
+              product: "ตรวจสอบแล้ว",
+              status: "SHIPPED"
+            });
+          }
+        });
+        const { error } = await supabaseClient.from("parcels_bb").upsert(batch, { onConflict: 'tracking_no' });
+        if (error) throw error;
+        setImportStatus({ processing: false, count: batch.length, logs: [`🔥 บรรจุสำเร็จ ${batch.length} พิกัด!`] });
+        fetchAdminData();
+      } catch (err) {
+        setImportStatus({ processing: false, count: 0, logs: [`⚠️ ข้อผิดพลาด: ${err.message}`] });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#020005] text-white font-sans selection:bg-[#bc13fe] overflow-x-hidden relative">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Bai+Jamjuree:wght@300;400;600;700&display=swap');
+        .cyber-font { font-family: 'Orbitron', sans-serif; }
+        .thai-font { font-family: 'Bai Jamjuree', sans-serif; }
+        .glass-panel { background: rgba(13, 0, 26, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(188, 19, 254, 0.2); }
+        .neon-glow { text-shadow: 0 0 10px #bc13fe, 0 0 20px #bc13fe; }
+        
+        @property --angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+
+        .neon-border-running {
+          position: relative;
+          border: 2px solid transparent;
+          border-image: conic-gradient(from var(--angle), transparent 70%, #bc13fe) 1;
+          animation: rotate-angle 3s linear infinite;
+        }
+
+        @keyframes rotate-angle { to { --angle: 360deg; } }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #bc13fe; border-radius: 10px; }
+      `}} />
+
+      <div className="relative z-10 max-w-6xl mx-auto px-4 py-8 md:py-12 pb-32">
+        {/* 🕒 Header Ops */}
+        <div className="flex justify-between items-center mb-8">
+            <div className="space-y-1">
+                <p className="cyber-font text-[9px] text-gray-500 tracking-[0.3em] font-black italic">BB_EMPIRE_OS: ONLINE</p>
+                {isAuthorized && (
+                    <button onClick={() => setIsAuthorized(false)} className="text-[8px] cyber-font text-red-500 font-black tracking-widest uppercase hover:underline">Terminate_Session</button>
+                )}
+            </div>
+            <div className="neon-border-running px-6 py-3 bg-black/80 rounded-sm shadow-[0_0_30px_rgba(188,19,254,0.15)]">
+                <p className="cyber-font text-[9px] text-[#bc13fe] tracking-[0.2em] font-black mb-1 opacity-70 uppercase">Empire_Time</p>
+                <p className="cyber-font text-xl md:text-3xl font-black text-white tracking-widest leading-none">
+                    {currentTime.toLocaleTimeString('en-US', { hour12: false })}
+                </p>
+            </div>
+        </div>
+
+        {/* 🧭 Navigation */}
+        <div className="flex justify-center mb-16">
+          <div className="inline-flex glass-panel p-1.5 rounded-3xl border-[#bc13fe]/30 shadow-[0_0_40px_rgba(0,0,0,0.5)]">
+            {[
+              { id: 'dashboard', label: 'STATS', icon: '📊' },
+              { id: 'tracking', label: 'TRACK', icon: '🛰️' },
+              { id: 'ops', label: 'OPS', icon: '📥' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`px-8 py-4 rounded-2xl cyber-font text-[10px] md:text-xs font-black tracking-[0.3em] transition-all duration-500 ${activeTab === tab.id ? 'bg-[#bc13fe] text-white shadow-[0_0_25px_#bc13fe] scale-105' : 'text-gray-500 hover:text-white'}`}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 🛡️ SECURITY GATE */}
+        {showGate && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020005]/98 backdrop-blur-3xl">
+            <div className="glass-panel p-16 md:p-24 rounded-[3rem] border-[#bc13fe]/50 text-center max-w-lg w-full mx-4 shadow-[0_0_100px_rgba(0,0,0,1)]">
+              <h2 className="cyber-font text-2xl md:text-3xl font-black text-white mb-12 italic tracking-tighter uppercase">Authority_Verification</h2>
+              <input 
+                type="password"
+                value={passInput}
+                onChange={(e) => setPassInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && verifyAccess()}
+                className="w-full bg-black/50 border-b-4 border-[#bc13fe] p-6 text-center text-5xl cyber-font tracking-[0.8em] outline-none text-[#bc13fe] mb-12"
+                placeholder="****"
+                autoFocus
+              />
+              <div className="flex gap-6">
+                <button onClick={() => setShowGate(false)} className="flex-1 py-4 cyber-font text-[10px] text-gray-500 uppercase tracking-widest font-black">Abort</button>
+                <button onClick={verifyAccess} className="flex-1 py-4 bg-[#bc13fe] cyber-font text-[10px] font-black rounded-xl shadow-[0_0_30px_#bc13fe] uppercase">Authorize</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- DASHBOARD (HOME) --- */}
+        {activeTab === "dashboard" && isAuthorized && (
+          <div className="animate-in fade-in duration-700 space-y-10">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="neon-border-running glass-panel rounded-3xl p-8 transition-all">
+                <p className="cyber-font text-[9px] text-gray-500 tracking-widest uppercase font-black">Total_Wealth</p>
+                <p className="thai-font text-4xl font-black italic text-white mt-4 tracking-tighter">฿{stats.totalCOD.toLocaleString()}</p>
+              </div>
+              <div className="neon-border-running glass-panel rounded-3xl p-8 border-[#bc13fe] transition-all">
+                <p className="cyber-font text-[9px] text-[#bc13fe] tracking-widest uppercase font-black italic">Today_Revenue</p>
+                <p className="thai-font text-4xl font-black italic text-white mt-4 tracking-tighter">฿{stats.todayCOD.toLocaleString()}</p>
+              </div>
+              <div className="glass-panel rounded-3xl p-8 border-l-4 border-white/10">
+                <p className="cyber-font text-[9px] text-gray-500 tracking-widest uppercase font-black">Total_Conquests</p>
+                <p className="thai-font text-4xl font-black italic text-[#bc13fe] mt-4 tracking-tighter">{stats.totalOrders.toLocaleString()}</p>
+              </div>
+              <div className="glass-panel rounded-3xl p-8 border-l-4 border-white/10">
+                <p className="cyber-font text-[9px] text-gray-500 tracking-widest uppercase font-black">Average_Bill</p>
+                <p className="thai-font text-4xl font-black italic text-white mt-4 tracking-tighter">฿{Math.round(stats.aov).toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="neon-border-running glass-panel rounded-[2.5rem] p-10 md:p-12 relative overflow-hidden">
+              <div className="flex justify-between items-end mb-8">
+                <div>
+                  <h3 className="cyber-font text-sm tracking-[0.5em] text-[#bc13fe] font-black uppercase italic">Empire_Mission: 100,000_Orders</h3>
+                  <p className="thai-font text-gray-500 text-xs mt-2 italic">อาณาจักรบีบีกำลังครอบคลุมส่วนแบ่งตลาด...</p>
+                </div>
+                <div className="text-right">
+                  <p className="cyber-font text-4xl font-black text-white italic drop-shadow-[0_0_15px_#bc13

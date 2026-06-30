@@ -1,298 +1,417 @@
-import React, { useState, useEffect } from "react";
-
-// ==========================================
-// [VERSION]: V42.0 - EMPIRE OVERLORD (STABLE)
-// [STATUS]: PRODUCTION READY / DASHBOARD DEFAULT
-// [SECRET]: Triple-click "PRECISION_LOCK" to trigger Secret Ops
-// [COLOR]: BB STORE (PURPLE-BLACK NEON)
-// ==========================================
-
-const SUPABASE_URL = "https://nlgecesyjcrrqwiitlyt.supabase.co";
-const SUPABASE_KEY = "sb_publishable_1agyo85-Uxq1VAllYjl1gg_M_utlMbw";
-const ACCESS_KEY = "1234";
-
-export default function App() {
-  const [activeTab, setActiveTab] = useState("dashboard"); 
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [passInput, setPassInput] = useState("");
-  const [showGate, setShowGate] = useState(false);
-  
-  const [supabaseClient, setSupabaseClient] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  
-  // Stats & Data
-  const [phone, setPhone] = useState("");
-  const [trackingData, setTrackingData] = useState(null);
-  const [orders, setOrders] = useState([]);
-  const [stats, setStats] = useState({ totalOrders: 0, totalCOD: 0, todayCOD: 0, aov: 0 });
-  const [adminSearch, setAdminSearch] = useState("");
-  const [importStatus, setImportStatus] = useState({ processing: false, count: 0, logs: [] });
-
-  const EMPIRE_GOAL = 100000;
-
-  // 🕒 Initialization
-  useEffect(() => {
-    const scripts = [
-      'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-      'https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js'
-    ];
-    let loadedCount = 0;
-    scripts.forEach(src => {
-      const script = document.createElement('script');
-      script.src = src;
-      script.async = true;
-      script.onload = () => {
-        loadedCount++;
-        if (loadedCount === scripts.length && window.supabase) {
-          // @ts-ignore
-          setSupabaseClient(window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY));
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BB STORE | COMMAND CENTER V52.0</title>
+    <!-- 
+    ==========================================================================
+    🛡️ THE IMMUTABLE PROTOCOL (BB TRUE EMPIRE - REAL-TIME RESET)
+    ==========================================================================
+    [VERSION]: V52.0 - THE ABSOLUTE TRUTH
+    [STATUS]: SNAPSHOT LOCKED & VERIFIED (FIXED FOR VERCEL STATIC DEPLOY)
+    [AUTHORITY]: User Command Only (DARKSIDE 🔴⚫️)
+    [BRANDING]: BB STORE (Purple-Black 📦)
+    ==========================================================================
+    -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Bai+Jamjuree:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --neon-theme: #bc13fe; --dark-bg: #0d001a; }
+        body { 
+            background-color: var(--dark-bg); 
+            color: white; 
+            font-family: 'Bai Jamjuree', sans-serif; 
+            overflow-x: hidden; 
         }
-      };
-      document.body.appendChild(script);
-    });
-
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // 🔒 Fetch Logic
-  const fetchAdminData = async () => {
-    if (!supabaseClient || !isAuthorized) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabaseClient
-        .from("parcels_bb")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (!error && data) {
-        setOrders(data);
-        const totalCOD = data.reduce((sum, item) => sum + Number(item.cod_amount || 0), 0);
-        
-        const todayStr = new Date().toISOString().split('T')[0];
-        const todayCOD = data
-          .filter(item => item.created_at && item.created_at.startsWith(todayStr))
-          .reduce((sum, item) => sum + Number(item.cod_amount || 0), 0);
-
-        const totalOrders = data.length;
-        const aov = totalOrders > 0 ? totalCOD / totalOrders : 0;
-        setStats({ totalOrders, totalCOD, todayCOD, aov });
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isAuthorized) fetchAdminData();
-  }, [supabaseClient, isAuthorized]);
-
-  const handleTabChange = (tab) => {
-    if ((tab === 'dashboard' || tab === 'ops') && !isAuthorized) {
-      setShowGate(true);
-      return;
-    }
-    setActiveTab(tab);
-    setShowGate(false);
-  };
-
-  const verifyAccess = () => {
-    if (passInput === ACCESS_KEY) {
-      setIsAuthorized(true);
-      setShowGate(false);
-      setPassInput("");
-      setActiveTab("dashboard");
-    } else {
-      setPassInput(""); // Simple feedback instead of alert
-    }
-  };
-
-  // 🕵️ Secret Reset Ops
-  const [clickCount, setClickCount] = useState(0);
-  const handleSecretClick = () => {
-    setClickCount(prev => prev + 1);
-    if (clickCount >= 2) {
-      const confirmReset = window.confirm("SECRET_OPS: รีเซ็ตยอดรายวันหรือไม่? (ยอดสะสมจะไม่หาย)");
-      if (confirmReset) {
-        setStats(prev => ({ ...prev, todayCOD: 0 }));
-        setClickCount(0);
-      }
-    }
-    setTimeout(() => setClickCount(0), 2000);
-  };
-
-  const cleanName = (n) => n ? n.replace(/^[0-9\s.]+/, "").replace(/^(คุณ|นาย|นางสาว|นาง|👤)\s*/gi, "").trim() : "ลูกค้า VIP";
-
-  const handleSearch = async () => {
-    if (!supabaseClient || phone.trim().length < 4) return;
-    setLoading(true);
-    setTrackingData(null);
-    try {
-      const { data } = await supabaseClient
-        .from("parcels_bb")
-        .select("consignee_name, tracking_no, cod_amount")
-        .or(`phone_no.ilike.%${phone.trim()}%,tracking_no.ilike.%${phone.trim()}%`)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (data) setTrackingData(data);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file || !supabaseClient) return;
-    setImportStatus({ processing: true, count: 0, logs: ["📡 เชื่อมต่อคลังแสงอาณาจักรบีบี..."] });
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        // @ts-ignore
-        const workbook = window.XLSX.read(data, { type: 'array' });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        // @ts-ignore
-        const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1 });
-        const batch = [];
-        rows.forEach((row, i) => {
-          if (i === 0) return;
-          const track = String(row[2] || "").trim();
-          if (!track.toUpperCase().startsWith("TH")) return;
-          const phoneNum = String(row[4] || "").replace(/\D/g, "");
-          if (phoneNum.length >= 9) {
-            batch.push({
-              tracking_no: track.toUpperCase(),
-              phone_no: phoneNum,
-              consignee_name: cleanName(String(row[3] || "")),
-              address: String(row[5] || ""),
-              cod_amount: parseFloat(String(row[9] || "0").replace(/,/g, "")) || 0,
-              product: "ตรวจสอบแล้ว",
-              status: "SHIPPED"
-            });
-          }
-        });
-        const { error } = await supabaseClient.from("parcels_bb").upsert(batch, { onConflict: 'tracking_no' });
-        if (error) throw error;
-        setImportStatus({ processing: false, count: batch.length, logs: [`🔥 บรรจุสำเร็จ ${batch.length} พิกัด!`] });
-        fetchAdminData();
-      } catch (err) {
-        setImportStatus({ processing: false, count: 0, logs: [`⚠️ ข้อผิดพลาด: ${err.message}`] });
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  return (
-    <div className="min-h-screen bg-[#020005] text-white font-sans selection:bg-[#bc13fe] overflow-x-hidden relative">
-      <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Bai+Jamjuree:wght@300;400;600;700&display=swap');
         .cyber-font { font-family: 'Orbitron', sans-serif; }
-        .thai-font { font-family: 'Bai Jamjuree', sans-serif; }
-        .glass-panel { background: rgba(13, 0, 26, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(188, 19, 254, 0.2); }
-        .neon-glow { text-shadow: 0 0 10px #bc13fe, 0 0 20px #bc13fe; }
+        .glass-panel { 
+            background: rgba(13, 0, 26, 0.95); 
+            backdrop-filter: blur(40px); 
+            border: 1px solid rgba(188, 19, 254, 0.05); 
+        }
+        .neon-glow { text-shadow: 0 0 10px var(--neon-theme), 0 0 20px var(--neon-theme); }
         
         @property --angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
-
         .neon-border-running {
-          position: relative;
-          border: 2px solid transparent;
-          border-image: conic-gradient(from var(--angle), transparent 70%, #bc13fe) 1;
-          animation: rotate-angle 3s linear infinite;
+            position: relative;
+            border: 2px solid transparent;
+            border-image: conic-gradient(from var(--angle), transparent 50%, var(--neon-theme)) 1;
+            animation: rotate-angle 3s linear infinite;
         }
-
         @keyframes rotate-angle { to { --angle: 360deg; } }
         
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #bc13fe; border-radius: 10px; }
-      `}} />
+        .custom-scrollbar::-webkit-scrollbar { width: 2px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--neon-theme); }
+        .btn-active { 
+            background: var(--neon-theme); 
+            box-shadow: 0 0 30px var(--neon-theme); 
+            color: white; 
+            transform: scale(1.05);
+        }
+        .msg-box { position: fixed; top: 20px; right: 20px; padding: 20px; border-radius: 12px; z-index: 1000; animation: slideIn 0.5s ease; border-left: 4px solid var(--neon-theme); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 py-8 md:py-12 pb-32">
-        {/* 🕒 Header Ops */}
-        <div className="flex justify-between items-center mb-8">
-            <div className="space-y-1">
-                <p className="cyber-font text-[9px] text-gray-500 tracking-[0.3em] font-black italic">BB_EMPIRE_OS: ONLINE</p>
-                {isAuthorized && (
-                    <button onClick={() => setIsAuthorized(false)} className="text-[8px] cyber-font text-red-500 font-black tracking-widest uppercase hover:underline">Terminate_Session</button>
-                )}
-            </div>
-            <div className="neon-border-running px-6 py-3 bg-black/80 rounded-sm shadow-[0_0_30px_rgba(188,19,254,0.15)]">
-                <p className="cyber-font text-[9px] text-[#bc13fe] tracking-[0.2em] font-black mb-1 opacity-70 uppercase">Empire_Time</p>
-                <p className="cyber-font text-xl md:text-3xl font-black text-white tracking-widest leading-none">
-                    {currentTime.toLocaleTimeString('en-US', { hour12: false })}
-                </p>
-            </div>
-        </div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
 
-        {/* 🧭 Navigation */}
-        <div className="flex justify-center mb-16">
-          <div className="inline-flex glass-panel p-1.5 rounded-3xl border-[#bc13fe]/30 shadow-[0_0_40px_rgba(0,0,0,0.5)]">
-            {[
-              { id: 'dashboard', label: 'STATS', icon: '📊' },
-              { id: 'tracking', label: 'TRACK', icon: '🛰️' },
-              { id: 'ops', label: 'OPS', icon: '📥' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`px-8 py-4 rounded-2xl cyber-font text-[10px] md:text-xs font-black tracking-[0.3em] transition-all duration-500 ${activeTab === tab.id ? 'bg-[#bc13fe] text-white shadow-[0_0_25px_#bc13fe] scale-105' : 'text-gray-500 hover:text-white'}`}
-              >
-                {tab.icon} {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        const SUPABASE_URL = "https://yyqptukudsuizpklfrdd.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cXB0dWt1ZHN1aXpwa2xmcmRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MzU5ODAsImV4cCI6MjA5NzUxMTk4MH0.6z_NdqgTBfVKTUVssv_MOnyhGAWViv72PikgW5EuIxQ";
+        const TABLE_NAME = "parcels"; // 👈 เปลี่ยนเป็นโต๊ะธรรมดาตามสั่งเรียบร้อย!
+        const GHOST_TABLE = "failed_checks_bb";
+        const BRAND_COLOR = "#bc13fe";
+        const BRAND_BG = "#0d001a";
 
-        {/* 🛡️ SECURITY GATE */}
-        {showGate && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020005]/98 backdrop-blur-3xl">
-            <div className="glass-panel p-16 md:p-24 rounded-[3rem] border-[#bc13fe]/50 text-center max-w-lg w-full mx-4 shadow-[0_0_100px_rgba(0,0,0,1)]">
-              <h2 className="cyber-font text-2xl md:text-3xl font-black text-white mb-12 italic tracking-tighter uppercase">Authority_Verification</h2>
-              <input 
-                type="password"
-                value={passInput}
-                onChange={(e) => setPassInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && verifyAccess()}
-                className="w-full bg-black/50 border-b-4 border-[#bc13fe] p-6 text-center text-5xl cyber-font tracking-[0.8em] outline-none text-[#bc13fe] mb-12"
-                placeholder="****"
-                autoFocus
-              />
-              <div className="flex gap-6">
-                <button onClick={() => setShowGate(false)} className="flex-1 py-4 cyber-font text-[10px] text-gray-500 uppercase tracking-widest font-black">Abort</button>
-                <button onClick={verifyAccess} className="flex-1 py-4 bg-[#bc13fe] cyber-font text-[10px] font-black rounded-xl shadow-[0_0_30px_#bc13fe] uppercase">Authorize</button>
-              </div>
-            </div>
-          </div>
-        )}
+        function App() {
+            const [activeTab, setActiveTab] = useState("dashboard");
+            const [supabaseClient, setSupabaseClient] = useState(null);
+            const [currentTime, setCurrentTime] = useState(new Date());
+            const [orders, setOrders] = useState([]);
+            const [stats, setStats] = useState({ 
+                totalOrders: 0, 
+                totalCOD: 0, 
+                todayCOD: 0, 
+                todayOrders: 0, 
+                aov: 0 
+            });
+            const [adminSearch, setAdminSearch] = useState("");
+            const [ghostTargets, setGhostTargets] = useState([]);
+            const [importStatus, setImportStatus] = useState({ processing: false, count: 0, logs: [] });
+            const [message, setMessage] = useState(null);
 
-        {/* --- DASHBOARD (HOME) --- */}
-        {activeTab === "dashboard" && isAuthorized && (
-          <div className="animate-in fade-in duration-700 space-y-10">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="neon-border-running glass-panel rounded-3xl p-8 transition-all">
-                <p className="cyber-font text-[9px] text-gray-500 tracking-widest uppercase font-black">Total_Wealth</p>
-                <p className="thai-font text-4xl font-black italic text-white mt-4 tracking-tighter">฿{stats.totalCOD.toLocaleString()}</p>
-              </div>
-              <div className="neon-border-running glass-panel rounded-3xl p-8 border-[#bc13fe] transition-all">
-                <p className="cyber-font text-[9px] text-[#bc13fe] tracking-widest uppercase font-black italic">Today_Revenue</p>
-                <p className="thai-font text-4xl font-black italic text-white mt-4 tracking-tighter">฿{stats.todayCOD.toLocaleString()}</p>
-              </div>
-              <div className="glass-panel rounded-3xl p-8 border-l-4 border-white/10">
-                <p className="cyber-font text-[9px] text-gray-500 tracking-widest uppercase font-black">Total_Conquests</p>
-                <p className="thai-font text-4xl font-black italic text-[#bc13fe] mt-4 tracking-tighter">{stats.totalOrders.toLocaleString()}</p>
-              </div>
-              <div className="glass-panel rounded-3xl p-8 border-l-4 border-white/10">
-                <p className="cyber-font text-[9px] text-gray-500 tracking-widest uppercase font-black">Average_Bill</p>
-                <p className="thai-font text-4xl font-black italic text-white mt-4 tracking-tighter">฿{Math.round(stats.aov).toLocaleString()}</p>
-              </div>
-            </div>
+            const EMPIRE_GOAL_HOUSES = 1000;
 
-            <div className="neon-border-running glass-panel rounded-[2.5rem] p-10 md:p-12 relative overflow-hidden">
-              <div className="flex justify-between items-end mb-8">
-                <div>
-                  <h3 className="cyber-font text-sm tracking-[0.5em] text-[#bc13fe] font-black uppercase italic">Empire_Mission: 100,000_Orders</h3>
-                  <p className="thai-font text-gray-500 text-xs mt-2 italic">อาณาจักรบีบีกำลังครอบคลุมส่วนแบ่งตลาด...</p>
-                </div>
-                <div className="text-right">
-                  <p className="cyber-font text-4xl font-black text-white italic drop-shadow-[0_0_15px_#bc13
+            const notify = (text, type = "info") => {
+                setMessage({ text, type });
+                setTimeout(() => setMessage(null), 4000);
+            };
+
+            useEffect(() => {
+                const scripts = [
+                    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+                    'https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js'
+                ];
+                let loadedCount = 0;
+                scripts.forEach(src => {
+                    const script = document.createElement('script');
+                    script.src = src;
+                    script.async = true;
+                    script.onload = () => {
+                        loadedCount++;
+                        if (loadedCount === scripts.length && window.supabase) {
+                            // @ts-ignore
+                            setSupabaseClient(window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY));
+                        }
+                    };
+                    document.body.appendChild(script);
+                });
+
+                const timer = setInterval(() => {
+                    const now = new Date();
+                    // [MIDNIGHT RESET] รีเซ็ตหน้าปัดเมื่อขึ้นวันใหม่ (00:00:00)
+                    if (now.getHours() === 0 && now.getMinutes() === 0 && now.getSeconds() === 0) {
+                        fetchAdminData();
+                    }
+                    setCurrentTime(now);
+                }, 1000);
+                
+                return () => clearInterval(timer);
+            }, []);
+
+            const fetchAdminData = async () => {
+                if (!supabaseClient) return;
+                try {
+                    const { data: orderData, error } = await supabaseClient
+                        .from(TABLE_NAME)
+                        .select("*")
+                        .order("pickup_date", { ascending: false });
+
+                    if (!error && orderData) {
+                        const totalCOD = orderData.reduce((sum, item) => sum + Number(item.cod_amount || 0), 0);
+                        const todayStr = new Date().toLocaleDateString('en-CA'); 
+                        
+                        const todayItems = orderData.filter(item => 
+                            item.pickup_date && item.pickup_date.startsWith(todayStr)
+                        );
+
+                        const todayCOD = todayItems.reduce((sum, item) => sum + Number(item.cod_amount || 0), 0);
+                        const todayOrders = todayItems.length;
+                        
+                        setOrders(orderData);
+                        setStats({
+                            totalOrders: orderData.length,
+                            totalCOD,
+                            todayCOD,
+                            todayOrders,
+                            aov: orderData.length > 0 ? totalCOD / orderData.length : 0
+                        });
+                    }
+
+                    // ดักจับเรดาร์เบอร์หลุด
+                    const { data: ghostData } = await supabaseClient
+                        .from(GHOST_TABLE)
+                        .select("*")
+                        .order("pickup_date", { ascending: false })
+                        .limit(15);
+                    if (ghostData) setGhostTargets(ghostData);
+
+                } catch (e) { console.error("CONNECTION_ERROR:", e); }
+            };
+
+            useEffect(() => {
+                if (supabaseClient) {
+                    fetchAdminData();
+                    const refreshInterval = setInterval(fetchAdminData, 30000);
+                    return () => clearInterval(refreshInterval);
+                }
+            }, [supabaseClient, activeTab]);
+
+            const cleanName = (n) => n ? String(n).replace(/^[0-9\s.]+/, "").replace(/^(คุณ|นาย|นางสาว|นาง|👤)\s*/gi, "").trim() : "ลูกค้า VIP";
+
+            const handleFileUpload = async (event) => {
+                const file = event.target.files[0];
+                if (!file || !supabaseClient) return;
+                setImportStatus({ processing: true, count: 0, logs: ["📡 กำลังบรรจุกระสุนเข้าอาณาจักร BB..."] });
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        // @ts-ignore
+                        const workbook = window.XLSX.read(data, { type: 'array' });
+                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                        // @ts-ignore
+                        const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                        
+                        if (rows.length < 2) throw new Error("ไฟล์ไม่มีข้อมูล");
+
+                        const headerRow = rows[0].map(h => String(h || "").replace(/\s/g, ""));
+                        const findIdx = (keywords) => headerRow.findIndex(h => keywords.some(k => h.includes(k)));
+
+                        const idx = {
+                            track: findIdx(["เลขพัสดุ", "หมายเลขพัสดุ", "Article", "Tracking"]),
+                            name: findIdx(["ชื่อผู้รับ", "ชื่อ", "consignee"]),
+                            phone: findIdx(["เบอร์ผู้รับ", "เบอร์โทร", "Phone", "Mobile"]),
+                            cod: findIdx(["ยอดCOD", "CODAmount", "เก็บเงินปลายทาง"]),
+                            address: findIdx(["ที่อยู่ที่รับ", "ที่อยู่", "Address"])
+                        };
+
+                        const batch = [];
+                        rows.forEach((row, i) => {
+                            if (i === 0) return;
+                            const trackVal = String(row[idx.track > -1 ? idx.track : 2] || "").trim().toUpperCase();
+                            if (!trackVal.startsWith("TH")) return;
+
+                            batch.push({
+                                tracking_number: trackVal,
+                                phone_number: String(row[idx.phone > -1 ? idx.phone : 4] || "").replace(/\D/g, ""),
+                                consignee: cleanName(row[idx.name > -1 ? idx.name : 3]),
+                                address: String(row[idx.address > -1 ? idx.address : 5] || ""),
+                                cod_amount: parseFloat(String(row[idx.cod > -1 ? idx.cod : 9] || "0").replace(/,/g, "")) || 0,
+                                product: "BB_RECOVERY_SYNC",
+                                status: "SHIPPED"
+                            });
+                        });
+
+                        const { error } = await supabaseClient.from(TABLE_NAME).upsert(batch, { onConflict: 'tracking_number' });
+                        if (error) throw error;
+
+                        setImportStatus({ processing: false, count: batch.length, logs: [`🔥 บรรจุสำเร็จ: ${batch.length} บ้าน!`] });
+                        notify(`กู้คืนและบรรจุสำเร็จ ${batch.length} ออเดอร์`, "success");
+                        fetchAdminData();
+                    } catch (err) { 
+                        setImportStatus({ processing: false, count: 0, logs: [`⚠️ วิกฤต: ${err.message}`] }); 
+                        notify("ความผิดพลาดในการบรรจุข้อมูล", "error");
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            };
+
+            const filteredOrders = orders.filter(o => 
+                (o.phone_no + o.tracking_number + o.consignee).toLowerCase().includes(adminSearch.toLowerCase())
+            );
+
+            const copyToClipboard = (text) => {
+                const el = document.createElement('textarea');
+                el.value = text;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+                notify("คัดลอกพิกัดแล้ว: " + text, "success");
+            };
+
+            return (
+                <main className="min-h-screen bg-[#0d001a] text-white font-sans selection:bg-[#bc13fe] pb-24 relative overflow-hidden">
+                    <div className="fixed inset-0 pointer-events-none transition-all duration-1000 z-0">
+                        <div className="absolute top-0 right-1/4 w-[900px] h-[900px] opacity-[0.2] blur-[150px] rounded-full bg-[#bc13fe]" />
+                        <div className="absolute inset-0 opacity-[0.05] bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
+                    </div>
+
+                    {message && (
+                        <div className="msg-box glass-panel cyber-font text-[10px] font-black uppercase">
+                            <span className={message.type === 'error' ? 'text-red-500' : 'text-[#bc13fe]'}>
+                                {message.type === 'error' ? '⚠️' : '🛡️'} {message.text}
+                            </span>
+                        </div>
+                    )}
+
+                    <div className="relative z-10 max-w-7xl mx-auto p-4 md:p-12">
+                        
+                        {/* --- Header Section --- */}
+                        <div className="flex flex-col md:flex-row justify-between items-center md:items-start mb-10 gap-6">
+                            <div className="text-center md:text-left">
+                                <div className="flex items-center justify-center md:justify-start gap-4 mb-2">
+                                    <span className="text-3xl neon-glow">📦</span>
+                                    <h2 className="cyber-font text-2xl md:text-3xl tracking-[0.4em] font-black uppercase text-[#bc13fe]">BB STORE</h2>
+                                </div>
+                                <p className="cyber-font text-[9px] tracking-[0.2em] opacity-30 uppercase italic">Commander_Elite_V52.0_The_Truth</p>
+                            </div>
+                            <div className="neon-border-running px-8 py-4 bg-black/90 rounded-sm text-center">
+                                <p className="cyber-font text-[9px] tracking-[0.2em] font-black mb-1 opacity-40 uppercase">MIDNIGHT_SYNC_CLOCK</p>
+                                <p className="cyber-font text-2xl md:text-4xl font-black text-white tracking-[0.1em]">{currentTime.toLocaleTimeString('en-US', { hour12: false })}</p>
+                            </div>
+                        </div>
+
+                        {/* --- Navigation --- */}
+                        <div className="flex justify-center mb-12">
+                            <div className="inline-flex glass-panel p-1.5 rounded-full shadow-2xl border-white/5 gap-1">
+                                {['dashboard', 'ops'].map(id => (
+                                    <button
+                                        key={id}
+                                        onClick={() => setActiveTab(id)}
+                                        className={`px-10 md:px-16 py-5 rounded-full cyber-font text-[11px] font-black tracking-[0.3em] transition-all ${activeTab === id ? 'btn-active' : 'text-white/20 hover:text-white/40'}`}
+                                    >
+                                        {id === 'dashboard' ? '📊 STATS' : '📥 IMPORT'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* --- DASHBOARD TAB --- */}
+                        {activeTab === "dashboard" && (
+                            <div className="animate-in fade-in duration-700 space-y-8">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+                                    {[
+                                        { label: 'TODAY_GAINS', val: `฿${stats.todayCOD.toLocaleString()}`, h: true },
+                                        { label: 'TODAY_HOUSES', val: `${stats.todayOrders} บ้าน`, h: true },
+                                        { label: 'TOTAL_EMPIRE_COD', val: `฿${stats.totalCOD.toLocaleString()}`, h: false },
+                                        { label: 'AVG_PER_HOUSE', val: `฿${Math.round(stats.aov).toLocaleString()}`, h: false }
+                                    ].map((c, i) => (
+                                        <div key={i} className="glass-panel p-6 md:p-10 border-b-4 shadow-xl flex flex-col justify-center" style={{ borderBottomColor: c.h ? BRAND_COLOR : 'rgba(255,255,255,0.05)' }}>
+                                            <p className="cyber-font text-[9px] text-white/40 tracking-[0.2em] font-black uppercase mb-4 italic">{c.label}</p>
+                                            <p className="text-xl md:text-4xl font-black italic text-white tracking-tighter truncate">{c.val}</p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* 🎯 Real-time Mission Progress (1,000 Houses Daily) */}
+                                <div className="neon-border-running glass-panel rounded-sm p-8 md:p-14 shadow-2xl">
+                                    <div className="flex justify-between items-end mb-8">
+                                        <div className="space-y-1">
+                                            <h3 className="cyber-font text-xs md:text-2xl tracking-[0.4em] font-black uppercase text-[#bc13fe]">MISSION: 1,000_HOUSES_DAILY</h3>
+                                            <p className="text-white/20 text-[10px] uppercase tracking-widest italic">REALITY RESET AT 00:00:00 🕛</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="cyber-font text-xl md:text-5xl font-black text-white italic drop-shadow-md">
+                                                {((stats.todayOrders / EMPIRE_GOAL_HOUSES) * 100).toFixed(2)}%
+                                            </p>
+                                            <p className="cyber-font text-[10px] text-white/40 mt-2 uppercase tracking-widest">{stats.todayOrders} / 1,000 UNITS</p>
+                                        </div>
+                                    </div>
+                                    <div className="w-full h-5 bg-black/60 rounded-full overflow-hidden border border-white/5 p-1">
+                                        <div className="h-full rounded-full transition-all duration-[2000ms]" style={{ width: `${Math.min((stats.todayOrders / EMPIRE_GOAL_HOUSES) * 100, 100)}%`, background: `linear-gradient(90deg, ${BRAND_COLOR}, #fff)`, boxShadow: `0 0 25px ${BRAND_COLOR}` }} />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                                    {/* Ghost Radar */}
+                                    <div className="lg:col-span-1 space-y-4">
+                                        <div className="glass-panel p-6 rounded-sm border-t-2 border-red-600 shadow-2xl">
+                                            <p className="cyber-font text-[10px] text-red-500 font-black tracking-widest animate-pulse mb-4 italic">⚠️ GHOST_RADAR_LIVE</p>
+                                            <div className="space-y-3 h-[450px] overflow-y-auto custom-scrollbar pr-2">
+                                                {ghostTargets.length > 0 ? ghostTargets.map((g, i) => (
+                                                    <div key={i} className="bg-black/40 p-3 border border-white/5 rounded-md hover:border-[#bc13fe]/30 transition-all cursor-pointer" onClick={() => copyToClipboard(g.search_input)}>
+                                                        <p className="text-[#bc13fe] font-mono text-sm font-black">{g.search_input}</p>
+                                                        <p className="text-[8px] text-gray-700 uppercase mt-1 italic">{new Date(g.pickup_date).toLocaleTimeString()}</p>
+                                                    </div>
+                                                )) : (
+                                                    <p className="text-[9px] text-gray-700 uppercase tracking-widest text-center mt-10 italic opacity-20">All Targets Tracked</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* Live Feed */}
+                                    <div className="lg:col-span-3 glass-panel rounded-sm overflow-hidden border-t-2 border-[#bc13fe] shadow-2xl">
+                                        <div className="p-6 md:p-10 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 bg-black/40">
+                                            <h3 className="cyber-font text-xs tracking-[0.5em] font-black uppercase text-[#bc13fe]">LIVE_REALITY_FEED</h3>
+                                            <input type="text" placeholder="สแกนพิกัดดาต้า..." className="bg-black/80 border border-white/10 rounded-full px-10 py-3 text-xs focus:border-white outline-none w-full md:w-[400px] text-center font-bold" value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} />
+                                        </div>
+                                        <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
+                                            {filteredOrders.length > 0 ? filteredOrders.map((ord, i) => (
+                                                <div key={i} className="p-6 border-b border-white/5 flex justify-between items-center group hover:bg-white/5 transition-all">
+                                                    <div className="max-w-[60%]">
+                                                        <p className="text-white text-lg font-black truncate">{ord.consignee}</p>
+                                                        <p className="cyber-font text-[11px] opacity-40 mt-1 uppercase text-[#bc13fe] font-black tracking-widest">{ord.tracking_no}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="font-black text-xl md:text-2xl italic text-white group-hover:neon-glow">฿{Number(ord.cod_amount).toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                            )) : (
+                                                <div className="p-20 text-center opacity-20 cyber-font text-xs uppercase tracking-widest italic">Data Unreachable</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- OPS CENTER TAB --- */}
+                        {activeTab === "ops" && (
+                            <div className="animate-in slide-in-from-bottom-10 duration-700 max-w-5xl mx-auto space-y-12 py-10 pb-20">
+                                <header className="text-center space-y-4">
+                                    <h2 className="cyber-font text-5xl md:text-8xl font-black text-white italic uppercase neon-glow">Ops_Center</h2>
+                                    <p className="cyber-font text-[12px] tracking-[1em] uppercase opacity-40 ml-[1em] text-[#bc13fe] italic">MASTER_SYNC: parcels_bb</p>
+                                </header>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="neon-border-running glass-panel rounded-sm p-12 md:p-24 text-center group cursor-pointer relative shadow-3xl overflow-hidden">
+                                        <input type="file" onChange={handleFileUpload} accept=".xls,.xlsx" className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                                        <div className="text-8xl md:text-[12rem] mb-8 opacity-90 transition-all group-hover:scale-110">📦</div>
+                                        <p className="cyber-font text-xl md:text-2xl text-white font-black uppercase italic">Deploy_New_Assets</p>
+                                    </div>
+                                    <div className="bg-black/98 p-8 md:p-12 rounded-sm font-mono text-[11px] md:text-[13px] h-[450px] md:h-[550px] overflow-y-auto border border-white/5 custom-scrollbar shadow-inner">
+                                        <p className="font-black border-b border-white/10 pb-6 mb-8 tracking-[0.6em] uppercase italic text-xs text-[#bc13fe]">
+                                            {"#>>> SYSTEM_STATUS_LOG"}
+                                        </p>
+                                        {importStatus.logs.map((log, i) => (
+                                            <p key={i} className={`mb-4 leading-relaxed ${log.includes("🔥") ? "text-white font-bold" : "text-gray-500 opacity-80"}`}>
+                                                {`[${new Date().toLocaleTimeString()}] ${log}`}
+                                            </p>
+                                        ))}
+                                        {importStatus.processing && <p className="text-[#bc13fe] animate-pulse italic mt-4 font-black uppercase tracking-widest">🌀 กำลังสกัดดาต้าเข้าคลังแสง...</p>}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <footer className="fixed bottom-0 left-0 w-full py-10 bg-black/98 backdrop-blur-3xl border-t border-white/5 text-center z-50">
+                        <p className="cyber-font text-[9px] text-white/10 font-black tracking-[4em] md:tracking-[8em] uppercase italic ml-[4em] md:ml-[8em]">System_V52.0 • BB STORE • Absolute_Truth_Locked</p>
+                    </footer>
+                </main>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

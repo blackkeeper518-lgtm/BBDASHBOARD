@@ -215,7 +215,7 @@
                                 consignee: cleanName(row[idx.name > -1 ? idx.name : 3]),
                                 address: String(row[idx.address > -1 ? idx.address : 5] || ""),
                                 cod_amount: parseFloat(String(row[idx.cod > -1 ? idx.cod : 9] || "0").replace(/,/g, "")) || 0,
-                                product: "BB_RECOVERY_SYNC",
+                          
                                 status: "SHIPPED"
                             });
                         });
